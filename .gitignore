@@ -1,0 +1,44 @@
+# Cabal / Stack build output
+dist
+dist-*
+dist-newstyle
+.stack-work
+
+# GHC interface / object files
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+*.hie
+*.chi
+*.chs.h
+
+# Coverage / profiling / runtime artifacts
+*.prof
+*.aux
+*.hp
+*.eventlog
+*.tix
+.hpc
+
+# REPL / local package environment
+.ghc.environment.*
+cabal.project.local
+cabal.project.local~
+
+# Nix / direnv outputs
+result
+result-*
+.direnv
+
+# Local environment files
+.env
+.env.*
+
+# Editor / generated index files
+*~
+.*.swp
+*.swp
+*.swo
+.DS_Store
+tags
