@@ -41,4 +41,5 @@ missing tutorial URL: https://docs.servant.dev/en/stable/tutorial/Client.html
 
 module tree symmetery for typescript client gen
 
-
+## HLS plugin for GHC-style notes
+https://github.com/haskell/haskell-language-server/issues/2964
