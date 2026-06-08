@@ -58,3 +58,6 @@ serve broadcastChan client = do
         message <- readTChan myChan
         send client message
 ```
+
+## HLS plugin for GHC-style notes
+https://github.com/haskell/haskell-language-server/issues/2964
