@@ -41,4 +41,20 @@ missing tutorial URL: https://docs.servant.dev/en/stable/tutorial/Client.html
 
 module tree symmetery for typescript client gen
 
+## Repl Workflow Tooling
 
+develop modules straight from REPL
+
+## Nix closure size analysis tools
+
+pi chart for a closure, what deps are shared, what are sole.
+
+## GHC Control.Current.STM doc is wrong
+```
+serve :: TChan Message -> Client -> IO loop
+serve broadcastChan client = do
+    myChan <- dupTChan broadcastChan
+    forever $ do
+        message <- readTChan myChan
+        send client message
+```

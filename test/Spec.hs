@@ -1,9 +1,6 @@
 module Main where
 
-import Lib (hello)
+import Lib (app)
 
 main :: IO ()
-main =
-  if hello == "Hello, Haskell!"
-    then putStrLn "Tests passed."
-    else error "Expected hello to return \"Hello, Haskell!\"."
+main = app

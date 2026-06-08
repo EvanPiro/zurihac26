@@ -1,6 +1,12 @@
 # zurihac26
 
+To develop:
 ```
 nix develop
-cabal run
+```
+
+To test:
+Run 
+```
+nc 127.0.0.1 3000
 ```

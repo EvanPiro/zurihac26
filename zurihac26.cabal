@@ -1,36 +1,52 @@
-cabal-version:      3.0
-name:               zurihac26
-version:            0.1.0.0
-license:            MIT
-license-file:       LICENSE
-build-type:         Simple
+cabal-version: 3.0
+name:          zurihac26
+version:       0.1.0.0
+license:       MIT
+license-file:  LICENSE
+build-type:    Simple
 
 common warnings
-  ghc-options: -Wall
+  ghc-options:      -Wall
   default-language: GHC2021
 
 library
-  import: warnings
-  hs-source-dirs: src
+  import:          warnings
+  hs-source-dirs:  src
   exposed-modules:
-      Lib
+    App
+    Lib
+
   build-depends:
-      base >=4.18 && <5
-      , text
+    , async
+    , base            >=4.18 && <5
+    , beam-core
+    , beam-migrate
+    , beam-sqlite
+    , bytestring
+    , containers
+    , list-t
+    , mtl
+    , network
+    , network-run
+    , random
+    , sqlite-simple
+    , stm
+    , stm-containers
+    , text
 
 executable zurihac26
-  import: warnings
+  import:         warnings
   hs-source-dirs: app
-  main-is: Main.hs
+  main-is:        Main.hs
   build-depends:
-      base >=4.18 && <5,
-      zurihac26
+    , base       >=4.18 && <5
+    , zurihac26
 
 test-suite zurihac26-test
-  import: warnings
-  type: exitcode-stdio-1.0
+  import:         warnings
+  type:           exitcode-stdio-1.0
   hs-source-dirs: test
-  main-is: Spec.hs
+  main-is:        Spec.hs
   build-depends:
-      base >=4.18 && <5,
-      zurihac26
+    , base       >=4.18 && <5
+    , zurihac26

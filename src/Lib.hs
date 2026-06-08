@@ -1,7 +1,9 @@
-module Lib
-  ( hello
-  ) where
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
-hello :: String
-hello = "Hello, Haskell!"
+module Lib (runApp) where
 
+import App (runApp)

@@ -1,7 +1,6 @@
 module Main where
 
-import Lib (hello)
+import Lib (runApp)
 
 main :: IO ()
-main = putStrLn hello
-
+main = runApp
