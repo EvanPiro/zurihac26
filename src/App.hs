@@ -13,6 +13,7 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
 import Data.ByteString.Char8 qualified as BS
 import HasChan (HasChan (..))
+import HasLogger (HasLogger (getLogLevel, log), LogLevel (..))
 import HasSockets (HasSockets (..))
 import Network.Run.TCP (runTCPServer)
 import Network.Socket (Socket)
@@ -22,6 +23,10 @@ import UnliftIO (MonadUnliftIO (withRunInIO), TVar, UnliftIO (unliftIO), atomica
 import UnliftIO.Async (async)
 import UnliftIO.Concurrent (threadDelay)
 import UnliftIO.STM (TChan)
+import Prelude hiding (log)
+
+appLogLevel :: LogLevel
+appLogLevel = Warning
 
 type MsgChan = TChan String
 type SockStore = TVar [Socket]
@@ -29,31 +34,31 @@ type SockStore = TVar [Socket]
 data Config = Config
     { channel :: MsgChan
     , sockets :: SockStore
+    , logLevel :: LogLevel
     }
 
 mkConfig :: IO Config
 mkConfig =
-    Config <$> newTChanIO <*> newTVarIO []
+    Config <$> newTChanIO <*> newTVarIO [] <*> pure appLogLevel
 
 newtype App r = App {unApp :: ReaderT Config IO r}
     deriving (Functor, Applicative, Monad, MonadIO, MonadUnliftIO, MonadReader Config)
 
-type AppM m = (HasSockets m, MonadIO m, MonadUnliftIO m, HasChan m)
+type AppM m = (HasSockets m, MonadIO m, MonadUnliftIO m, HasChan m, HasLogger m)
 
 instance HasSockets App where
     addSocket sock = do
         (Config{sockets}) <- ask
         liftIO $ do
             sendAll sock "You've been connected!\n"
-            putStrLn $ "socket added" <> show sock
+        log Info $ "socket added" <> show sock
         atomically $ do
             socks <- readTVar sockets
             writeTVar sockets (sock : socks)
 
     removeSocket sock = do
         (Config{sockets}) <- ask
-        liftIO $ do
-            putStrLn $ "removing the socket: " <> show sock
+        log Alert $ "removing the socket: " <> show sock
         atomically $ do
             socks <- readTVar sockets
             let newSocks = filter (\s -> s /= sock) socks
@@ -62,7 +67,7 @@ instance HasSockets App where
     broadcast msg = do
         (Config{sockets}) <- ask
         sks <- atomically $ readTVar sockets
-        liftIO $ putStrLn $ "sending to sockets: " <> (show $ length sks)
+        log Info $ "sending to sockets: " <> (show $ length sks)
         mapM_ send' sks
       where
         send' sock = withRunInIO $ \run ->
@@ -82,6 +87,18 @@ instance HasChan App where
     writeChan msg = do
         chan <- asks channel
         atomically $ writeTChan chan msg
+
+instance HasLogger App where
+    getLogLevel = asks logLevel
+    log logLevel msg = do
+        maxLevel <- getLogLevel
+        if logLevel <= maxLevel
+            then
+                liftIO $
+                    putStrLn $
+                        "[" <> show logLevel <> "] " <> msg
+            else
+                pure ()
 
 runApp :: IO ()
 runApp =
@@ -104,7 +121,7 @@ writeWorker =
     forever $ do
         num <- randNum
         let msg = "hello, this is a message" <> show num <> "\n"
-        liftIO $ putStrLn $ "message pushed: " <> msg
+        log Info $ "message pushed: " <> msg
         writeChan msg
         threadDelay 1_000_000
 

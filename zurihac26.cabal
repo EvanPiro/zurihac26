@@ -15,6 +15,7 @@ library
   exposed-modules:
     App
     HasChan
+    HasLogger
     HasSockets
     Lib
 
@@ -27,6 +28,8 @@ library
     , bytestring
     , containers
     , list-t
+    , log-base
+    , logging-effect
     , mtl
     , network
     , network-run
