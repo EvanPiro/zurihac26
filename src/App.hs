@@ -46,18 +46,18 @@ instance HasSockets App where
         liftIO $ do
             sendAll sock "You've been connected!\n"
             putStrLn $ "socket added" <> show sock
-            atomically $ do
-                socks <- readTVar sockets
-                writeTVar sockets (sock : socks)
+        atomically $ do
+            socks <- readTVar sockets
+            writeTVar sockets (sock : socks)
 
     removeSocket sock = do
         (Config{sockets}) <- ask
         liftIO $ do
             putStrLn $ "removing the socket: " <> show sock
-            atomically $ do
-                socks <- readTVar sockets
-                let newSocks = filter (\s -> s /= sock) socks
-                writeTVar sockets newSocks
+        atomically $ do
+            socks <- readTVar sockets
+            let newSocks = filter (\s -> s /= sock) socks
+            writeTVar sockets newSocks
 
     broadcast msg = do
         (Config{sockets}) <- ask
@@ -100,13 +100,16 @@ app = do
             ]
 
 writeWorker :: (AppM m) => m ()
-writeWorker = do
+writeWorker =
     forever $ do
-        -- num <- liftIO $ randomIO :: m Int
-        let msg = "hello, this is a message\n"
+        num <- randNum
+        let msg = "hello, this is a message" <> show num <> "\n"
         liftIO $ putStrLn $ "message pushed: " <> msg
         writeChan msg
         threadDelay 1_000_000
+
+randNum :: (MonadIO m, MonadUnliftIO m) => m Int
+randNum = randomIO
 
 readWorker :: (AppM m) => m ()
 readWorker = forever $ do

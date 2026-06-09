@@ -40,6 +40,7 @@
             haskell-language-server
             haskellPackages."cabal-fmt"
             alejandra
+            netcat
           ];
           devshell.packagesFrom = [zurihac26Src];
 
@@ -51,6 +52,20 @@
                 fd --extension hs . app src test -x fourmolu --mode inplace {}
                 cabal-fmt --inplace zurihac26.cabal
                 fd --extension nix . -x alejandra {}
+              '';
+            }
+            {
+              name = "connect";
+              help = "connect to socket server";
+              command = ''
+                nc 127.0.0.1 3000
+              '';
+            }
+            {
+              name = "serve";
+              help = "start socket server";
+              command = ''
+                cabal run
               '';
             }
           ];
