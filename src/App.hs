@@ -125,7 +125,7 @@ writeWorker =
         writeChan msg
         threadDelay 1_000_000
 
-randNum :: (MonadIO m, MonadUnliftIO m) => m Int
+randNum :: (AppM m) => m Int
 randNum = randomIO
 
 readWorker :: (AppM m) => m ()
