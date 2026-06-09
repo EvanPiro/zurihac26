@@ -1,29 +1,33 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 
 module App where
 
-import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (async, waitAny)
-import Control.Concurrent.STM
-import Control.Exception (SomeException, finally, handle)
+import Control.Exception (SomeException)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT))
+import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
 import Data.ByteString.Char8 qualified as BS
+import HasChan (HasChan (..))
+import HasSockets (HasSockets (..))
 import Network.Run.TCP (runTCPServer)
 import Network.Socket (Socket)
 import Network.Socket.ByteString (sendAll)
 import System.Random (randomIO)
+import UnliftIO (MonadUnliftIO (withRunInIO), TVar, UnliftIO (unliftIO), atomically, finally, handle, newTChanIO, newTVarIO, readTChan, readTVar, waitAny, writeTChan, writeTVar)
+import UnliftIO.Async (async)
+import UnliftIO.Concurrent (threadDelay)
+import UnliftIO.STM (TChan)
 
 type MsgChan = TChan String
 type SockStore = TVar [Socket]
 
 data Config = Config
-    { chan :: MsgChan
+    { channel :: MsgChan
     , sockets :: SockStore
     }
 
@@ -31,70 +35,95 @@ mkConfig :: IO Config
 mkConfig =
     Config <$> newTChanIO <*> newTVarIO []
 
-type App = ReaderT Config IO ()
+newtype App r = App {unApp :: ReaderT Config IO r}
+    deriving (Functor, Applicative, Monad, MonadIO, MonadUnliftIO, MonadReader Config)
+
+type AppM m = (HasSockets m, MonadIO m, MonadUnliftIO m, HasChan m)
+
+instance HasSockets App where
+    addSocket sock = do
+        (Config{sockets}) <- ask
+        liftIO $ do
+            sendAll sock "You've been connected!\n"
+            putStrLn $ "socket added" <> show sock
+            atomically $ do
+                socks <- readTVar sockets
+                writeTVar sockets (sock : socks)
+
+    removeSocket sock = do
+        (Config{sockets}) <- ask
+        liftIO $ do
+            putStrLn $ "removing the socket: " <> show sock
+            atomically $ do
+                socks <- readTVar sockets
+                let newSocks = filter (\s -> s /= sock) socks
+                writeTVar sockets newSocks
+
+    broadcast msg = do
+        (Config{sockets}) <- ask
+        sks <- atomically $ readTVar sockets
+        liftIO $ putStrLn $ "sending to sockets: " <> (show $ length sks)
+        mapM_ send' sks
+      where
+        send' sock = withRunInIO $ \run ->
+            handle
+                ( \(e :: SomeException) -> do
+                    putStrLn $ show e
+                    run (removeSocket sock)
+                )
+                (sendAll sock $ BS.pack msg)
+    send sock msg =
+        liftIO $ sendAll sock $ BS.pack msg
+
+instance HasChan App where
+    readChan = do
+        chan <- asks channel
+        atomically $ readTChan chan
+    writeChan msg = do
+        chan <- asks channel
+        atomically $ writeTChan chan msg
 
 runApp :: IO ()
 runApp =
-    mkConfig >>= runReaderT app
+    mkConfig >>= (runReaderT $ unApp app)
 
-app :: App
+app :: (AppM m) => m ()
 app = do
-    (Config{chan, sockets}) <- ask
-    liftIO $ do
-        subsTr <- async $ runSubServer sockets
-        producerTr <- async $ producer chan
-        broadcastTr <- async $ broadcast chan sockets
-        void $
-            waitAny $
-                [ subsTr
-                , producerTr
-                , broadcastTr
-                ]
+    subsTr <- async $ runSubServer
+    producerTr <- async $ writeWorker
+    broadcastTr <- async $ readWorker
+    void $
+        waitAny $
+            [ subsTr
+            , producerTr
+            , broadcastTr
+            ]
 
-producer :: MsgChan -> IO ()
-producer chan = forever $ do
-    num <- liftIO $ randomIO :: IO Int
-    let msg = "random number is " <> show num <> "\n"
-    putStrLn $ "message pushed: " <> msg
-    atomically $ writeTChan chan msg
-    threadDelay 1_000_000
+writeWorker :: (AppM m) => m ()
+writeWorker = do
+    forever $ do
+        -- num <- liftIO $ randomIO :: m Int
+        let msg = "hello, this is a message\n"
+        liftIO $ putStrLn $ "message pushed: " <> msg
+        writeChan msg
+        threadDelay 1_000_000
 
-broadcast :: MsgChan -> SockStore -> IO ()
-broadcast chan' store = forever $ do
-    (msg, sks) <- atomically $ do
-        msg' <- readTChan chan'
-        sks' <- readTVar store
-        pure (msg', sks')
-    putStrLn $ "sending to sockets: " <> (show $ length sks)
-    mapM (flip (send store) msg) sks
+readWorker :: (AppM m) => m ()
+readWorker = forever $ do
+    msg <- readChan
+    broadcast msg
 
-send :: SockStore -> Socket -> String -> IO ()
-send store sock msg =
-    handle
-        ( \(e :: SomeException) -> do
-            putStrLn $ show e
-            removeSock store sock
-        )
-        (sendAll sock $ BS.pack msg)
+runSubServer :: (AppM m) => m ()
+runSubServer =
+    withRunInIO $ \run ->
+        runTCPServer (Just "127.0.0.1") "3000" (\sock -> run (connectSock sock))
 
-runSubServer :: SockStore -> IO ()
-runSubServer store =
-    runTCPServer (Just "127.0.0.1") "3000" $ connectSock store
-
-connectSock :: SockStore -> Socket -> IO ()
-connectSock store sock =
-    (`finally` removeSock store sock) $ do
-        sendAll sock "You've been connected!\n"
-        putStrLn $ "socket added" <> show sock
-        atomically $ do
-            socks <- readTVar store
-            writeTVar store (sock : socks)
+connectSock :: (AppM m) => Socket -> m ()
+connectSock sock =
+    (`finally` removeSocket sock) $ do
+        liftIO $
+            do
+                sendAll sock "You've been connected!\n"
+                putStrLn $ "socket added" <> show sock
+        addSocket sock
         forever $ threadDelay maxBound
-
-removeSock :: SockStore -> Socket -> IO ()
-removeSock store sock = do
-    putStrLn $ "removing the socket: " <> show sock
-    atomically $ do
-        socks <- readTVar store
-        let newSocks = filter (\s -> s /= sock) socks
-        writeTVar store newSocks

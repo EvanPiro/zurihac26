@@ -32,7 +32,6 @@ https://github.com/tdammers/migrant
 
 ## aeson ts client generation
 
-
 ## Servant Client
 
 missing tutorial URL: https://docs.servant.dev/en/stable/tutorial/Client.html

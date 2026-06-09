@@ -14,6 +14,8 @@ library
   hs-source-dirs:  src
   exposed-modules:
     App
+    HasChan
+    HasSockets
     Lib
 
   build-depends:
@@ -33,6 +35,7 @@ library
     , stm
     , stm-containers
     , text
+    , unliftio
 
 executable zurihac26
   import:         warnings
