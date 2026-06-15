@@ -13,7 +13,7 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
 import Data.ByteString.Char8 qualified as BS
 import HasChan (HasChan (..))
-import HasLogger (HasLogger (getLogLevel, log), LogLevel (..))
+import HasLogger (HasLogger (getMaxLogLevel, log), LogLevel (..))
 import HasSockets (HasSockets (..))
 import Network.Run.TCP (runTCPServer)
 import Network.Socket (Socket)
@@ -34,7 +34,7 @@ type SockStore = TVar [Socket]
 data Config = Config
     { channel :: MsgChan
     , sockets :: SockStore
-    , logLevel :: LogLevel
+    , maxLogLevel :: LogLevel
     }
 
 mkConfig :: IO Config
@@ -77,6 +77,7 @@ instance HasSockets App where
                     run (removeSocket sock)
                 )
                 (sendAll sock $ BS.pack msg)
+
     send sock msg =
         liftIO $ sendAll sock $ BS.pack msg
 
@@ -89,9 +90,9 @@ instance HasChan App where
         atomically $ writeTChan chan msg
 
 instance HasLogger App where
-    getLogLevel = asks logLevel
+    getMaxLogLevel = asks maxLogLevel
     log logLevel msg = do
-        maxLevel <- getLogLevel
+        maxLevel <- getMaxLogLevel
         if logLevel <= maxLevel
             then
                 liftIO $
@@ -102,10 +103,11 @@ instance HasLogger App where
 
 runApp :: IO ()
 runApp =
-    mkConfig >>= (runReaderT $ unApp app)
+    mkConfig >>= (runReaderT $ unApp workers)
 
-app :: (AppM m) => m ()
-app = do
+-- run all workers concurrently
+workers :: (AppM m) => m ()
+workers = do
     subsTr <- async $ runSubServer
     producerTr <- async $ writeWorker
     broadcastTr <- async $ readWorker
@@ -116,6 +118,7 @@ app = do
             , broadcastTr
             ]
 
+-- loops in message writes
 writeWorker :: (AppM m) => m ()
 writeWorker =
     forever $ do

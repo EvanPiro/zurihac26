@@ -26,5 +26,5 @@ instance Show LogLevel where
             Debug -> "debug"
 
 class HasLogger m where
-    getLogLevel :: m LogLevel
+    getMaxLogLevel :: m LogLevel
     log :: LogLevel -> String -> m ()
